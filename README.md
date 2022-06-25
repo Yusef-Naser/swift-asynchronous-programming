@@ -111,4 +111,145 @@ end
 
 # Publishers & Subscribers
 
+## Publisher
+- At the heart of Combine is the Publisher protocol. This protocol defines the requirements for a type to be able to transmit a sequence of values over time to one or more subscribers. In other words, a publisher publishes or emits events that can include values of interest.
+
+- If you’ve developed on Apple platforms before, you can think of a publisher as kind of like NotificationCenter. In fact, NotificationCenter now has a method named publisher(for:object:) that provides a Publisher type that can publish broadcasted notifications.
+
+- ### **So what’s the point of publishing notifications when a notification center is already capable of broadcasting its notifications without a publisher?**
+- You can think of these types of methods as a bridge from the old to the new — a way to Combine-ify existing APIs such as NotificationCenter.
+
+- A publisher emits two kinds of events:
+1- Values, also referred to as elements.
+2- A completion event.
+
+- A publisher can emit zero or more values but only one completion event, which can either be a normal completion event or an error. Once a publisher emits a completion event, it’s finished and can no longer emit any more events.
+- Before diving deeper into publishers and subscribers, you’ll first finish the example of using traditional NotificationCenter APIs to receive a notification by registering an observer. You’ll also unregister that observer when you’re no longer interested in receiving that notification.
+
+
+## Subscriber
+- Subscriber is a protocol that defines the requirements for a type to be able to receive input from a publisher
+```swift
+
+example(of: "Subscriber") {
+let myNotification = Notification.Name("MyNotification")
+let publisher = NotificationCenter.default
+.publisher(for: myNotification, object: nil)
+let center = NotificationCenter.default
+}
+
+```
+- If you were to post a notification now, the publisher wouldn’t emit it — and that’s an important distinction to remember. A publisher only emits an event when there’s at least one subscriber.
+
+### Subscribing with sink(_:_:)
+- Continuing the previous example, add the following code to the example to create a subscription to the publisher:
+
+```swift
+let subscription = publisher
+.sink { _ in
+print("Notification received from a publisher!")
+}
+```
+- With this code, you create a subscription by calling sink on the publisher — but don’t let the obscurity of that method name give you a sinking feeling. Option-click on sink and you’ll see that it simply provides an easy way to attach a subscriber with closures to handle output from a publisher. In this example, you ignore those closures and instead just print a message to indicate that a notification was received.
+
+- Run the playground and you’ll see the following:
+> ——— Example of: Publisher ——— 
+> Notification received from a publisher!
+
+- The sink operator will continue to receive as many values as the publisher emits. This is known as unlimited demand,  And although you ignored them in the previous example, the sink operator actually provides two closures: one to handle receiving a completion event, and one to handle receiving values.
+
+- To see how this works, add this new example to your playground:
+
+```swift
+example(of: "Just") {
+    // 1
+    let just = Just("Hello world!")
+    // 2
+    _ = just
+        .sink(
+        receiveCompletion: {
+            print("Received completion", $0)
+        },
+    receiveValue: {
+        print("Received value", $0)
+    })
+}
+```
+Here, you:
+1. Create a publisher using Just, which lets you create a publisher from a primitive value type.
+2. Create a subscription to the publisher and print a message for each received event. 
+Run the playground. You’ll see the following:
+
+> ——— Example of: Just ———
+Received value Hello world!
+Received completion finished
+
+- Option-click on Just and the Quick Help explains that it’s a publisher that emits its output to each subscriber once and then finishes.
+- Try adding another subscriber by adding the following code to the end of your example:
+
+```swift
+_ = just
+    .sink(
+    receiveCompletion: {
+        print("Received completion (another)", $0)
+    },
+    receiveValue: {
+        print("Received value (another)", $0)
+    })
+```
+- Run the playground. True to its word, a Just happily emits its output to each new subscriber exactly once and then finishes.
+
+> Received value (another) Hello world!
+Received completion (another) finished
+
+### Subscribing with assign(to:on:)
+
+- In addition to sink, the built-in assign(to:on:) operator enables you to assign the received value to a KVO-compliant property of an object.
+
+- Add this example to see how this works:
+
+```swift
+
+example(of: "assign(to:on:)") {
+    // 1
+    class SomeObject {
+        var value: String = "" {
+            didSet {
+                print(value)
+            }
+        }
+    }
+    // 2
+    let object = SomeObject()
+    // 3
+    let publisher = ["Hello", "world!"].publisher
+    // 4
+    _ = publisher
+    .assign(to: \.value, on: object)
+}
+
+```
+> ——— Example of: assign(to:on:) ———
+Hello
+world!
+
+### Cancellable
+- When a subscriber is done and no longer wants to receive values from a publisher, it’s a good idea to cancel the subscription to free up resources and stop any corresponding activities from occurring, such as network calls.
+- Subscriptions return an instance of AnyCancellable as a "cancellation token," which makes it possible to cancel the subscription when you’re done with it. AnyCancellable conforms to the Cancellable protocol, which requires the cancel() method exactly for that purpose.
+
+Finish the Subscriber example from earlier by adding the following code:
+
+```swift
+// 1
+center.post(name: myNotification, object: nil)
+// 2
+subscription.cancel()
+```
+- Cancel the subscription. You’re able to call cancel() on the subscription because the Subscription protocol inherits from Cancellable.
+- If you don’t explicitly call cancel() on a subscription, it will continue until the publisher completes, or until normal memory management causes a stored subscription to be deinitialized. At that point it will cancel the subscription for you.
+
+> **Note**: It’s also fine to ignore the return value from a subscription in a
+playground (for example, _ = just.sink...). However, one caveat: if you
+don’t store a subscription in full projects, that subscription will cancel as soon
+as the program flow exits the scope in which it was created!
 
