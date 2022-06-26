@@ -510,3 +510,455 @@ Second finished
 - What if there was a way that you could do the same thing in your own code? Well, it turns out, there is! Before moving on, comment out the entire "Future" example, so the future isn’t invoked every time you run the playground — otherwise its delayed output will be printed after the last example.
 
 ## Hello Subject
+
+```swift
+
+example(of: "PassthroughSubject") {
+    // 1
+    enum MyError: Error {
+    case test
+    }
+    // 2
+    final class StringSubscriber: Subscriber {
+        typealias Input = String
+        typealias Failure = MyError
+        func receive(subscription: Subscription) {
+            subscription.request(.max(2))
+        }
+        func receive(_ input: String) -> Subscribers.Demand {
+            print("Received value", input)
+            // 3
+            return input == "World" ? .max(1) : .none
+        }
+        func receive(completion: Subscribers.Completion<MyError>) {
+            print("Received completion", completion)
+        }
+    }
+    // 4
+    let subscriber = StringSubscriber()
+    
+    // 5
+    let subject = PassthroughSubject<String, MyError>()
+    // 6
+    subject.subscribe(subscriber)
+    // 7
+    let subscription = subject
+        .sink(
+            receiveCompletion: { completion in
+                print("Received completion (sink)", completion)
+            },
+            receiveValue: { value in
+                print("Received value (sink)", value)
+            }
+        )
+    
+    
+}
+
+```
+
+1. Define a custom error type.
+2. Define a custom subscriber that receives strings and MyError errors.
+3. Adjust the demand based on the received value.
+4. Create an instance of the custom subscriber.
+5. Creates an instance of a PassthroughSubject of type String and the custom error type you defined.
+6. Subscribes the subscriber to the subject.
+7. Creates another subscription using sink.
+
+
+- Returning .max(1) in receive(_:) when the input is "World" results in the new max being set to 3 (the original max plus 1), Other than defining a custom error type and pivoting on the received value to adjust demand
+
+- Passthrough subjects enable you to publish new values on demand. They will happily pass along those values and a completion event. As with any publisher, you must declare the type of values and errors it can emit in advance; subscribers must match those types to its input and failure types in order to subscribe to that passthrough subject.
+
+- Now that you’ve created a passthrough subject that can send values and subscriptions to receive them, it’s time to send some values. Add the following code to your example:
+
+```swift
+subject.send("Hello")
+subject.send("World")
+```
+> ——— Example of: PassthroughSubject ——— 
+Received value Hello 
+Received value (sink) Hello
+Received value World
+Received value (sink) World
+
+Add the following code:
+
+```swift
+    // 8
+    subscription.cancel()
+    // 9
+    subject.send("Still there?")
+```
+8. Cancel the second subscription.
+9. Send another value.
+
+- Run the playground. As you might have expected, only the first subscriber receives the value. This happens because you previously canceled the second subscriber’s subscription:
+
+> ——— Example of: PassthroughSubject ——— 
+Received value Hello
+Received value (sink) Hello
+Received value World
+Received value (sink) World
+Received value Still there?
+
+- Add this code to the example:
+```swift
+subject.send(completion: .finished)
+subject.send("How about another one?") 
+```
+
+- Run the playground. The second subscriber does not receive the "How about another one?" value, because it received the completion event right before that value was sent. The first subscriber does not receive the completion event or the value, because its subscription was previously canceled.
+
+> ——— Example of: PassthroughSubject ——— 
+> Received value Hello 
+> Received value (sink) Hello
+> Received value World
+> Received value (sink) World
+> Received value Still there?
+> Received completion finished
+
+- Add the following code immediately before the line that sends the completion event.
+
+```swift
+subject.send(completion: .failure(MyError.test))
+```
+- Instead of storing each subscription as a value, you can store multiple subscriptions in a collection of AnyCancellable. The collection will then automatically cancel each subscription added to it when the collection is about to be deinitialized.
+
+```swift
+example(of: "CurrentValueSubject") {
+    // 1
+    let subject = CurrentValueSubject<Int, Never>(0)
+    // 2
+    subject
+    .sink(receiveValue: { print($0) })
+    .store(in: &subscriptions) // 3
+    
+    subject.send(1)
+subject.send(2)
+
+}
+```
+1- Create a CurrentValueSubject of type Int and Never. This will publish integers and never publish an error, with an initial value of 0.
+2- Create a subscription to the subject and print values received from it.
+3- Store the subscription in the subscriptions set, which is passed as an inout parameter so that the same set is updated instead of a copy.
+
+> ——— Example of: CurrentValueSubject ———
+> 0
+> 1
+> 2
+
+- Unlike a passthrough subject, you can ask a current value subject for its value at any time. Add the following code to print out the subject’s current value:
+
+```swift
+print(subject.value)
+subject.value = 3
+print(subject.value)
+
+```
+
+- Next, at the end of this example, create a new subscription to the current value subject:
+
+```swift
+subject
+.sink(receiveValue: { print("Second subscription:", $0) })
+.store(in: &subscriptions)
+```
+- You read a moment ago that the subscriptions set will automatically cancel the subscriptions added to it, but how can you verify this? You can use the print() operator, which will log all publishing events to the console.
+
+- Insert the print() operator in both subscriptions, between subject and sink. The beginning of each subscription should look like this:
+
+```swift
+subject
+.print()
+.sink...
+```
+- Run the playground again and you’ll see the following output for the entire example:
+> ——— Example of: CurrentValueSubject ———
+> receive subscription: (CurrentValueSubject)
+> request unlimited
+> receive value: (0)
+> 0
+> receive value: (1)
+> 1
+> receive value: (2)
+> 2
+> 2
+> receive value: (3)
+> 3
+> 3
+> receive subscription: (CurrentValueSubject)
+> request unlimited
+> receive value: (3)
+> Second subscription: 3
+> receive cancel
+> receive cancel
+
+- values. Completion events must still be sent using send(_:).
+```swift
+subject.send(completion: .finished)
+```
+
+## Dynamically adjusting demand
+
+```swift
+example(of: "Dynamically adjusting Demand") {
+final class IntSubscriber: Subscriber {
+    typealias Input = Int
+    typealias Failure = Never
+    func receive(subscription: Subscription) {
+        subscription.request(.max(2))
+    }
+    func receive(_ input: Int) -> Subscribers.Demand {
+        print("Received value", input)
+        switch input {
+        case 1:
+            return .max(2) // 1
+        case 3:
+            return .max(1) // 2
+        default:
+            return .none // 3
+        }
+    }
+    func receive(completion: Subscribers.Completion<Never>) {
+        print("Received completion", completion)
+    }
+}
+let subscriber = IntSubscriber()
+let subject = PassthroughSubject<Int, Never>()
+subject.subscribe(subscriber)
+subject.send(1)
+subject.send(2)
+subject.send(3)
+subject.send(4)
+subject.send(5)
+subject.send(6)
+}
+```
+1. The new max is 4 (original max of 2 + new max of 2).
+2. The new max is 5 (previous 4 + new 1).
+3. max remains 5 (previous 4 + new 0).
+
+- Run the playground and you’ll see the following:
+
+> ——— Example of: Dynamically adjusting Demand ———
+> Received value 1
+> Received value 2
+> Received value 3
+> Received value 4
+> Received value 5
+
+- As expected, five values are emitted but the sixth is not printed out.
+
+## Type erasure
+
+- There will be times when you want to let subscribers subscribe to receive events from a publisher without being able to access additional details about that publisher.
+- This would be best demonstrated with an example, so add this new one to your playground:
+
+```swift
+example(of: "Type erasure") {
+    // 1
+    let subject = PassthroughSubject<Int, Never>()
+    // 2
+    let publisher = subject.eraseToAnyPublisher()
+    // 3
+    publisher
+    .sink(receiveValue: { print($0) })
+    .store(in: &subscriptions)
+    // 4
+    subject.send(0)
+}
+```
+1. Create a passthrough subject.
+2. Create a type-erased publisher from that subject.
+3. Subscribe to the type-erased publisher.
+4. Send a new value through the passthrough subject.
+
+- AnyPublisher is a type-erased struct that conforms the Publisher protocol. Type erasure allows you to hide details about the publisher that you may not want to expose to subscribers — or downstream publishers, which you’ll learn about in the next section.
+- AnyCancellable is a type-erased class that conforms to Cancellable, which lets callers cancel the subscription without being able to access the underlying subscription to do things like request more items.
+
+- The eraseToAnyPublisher() operator wraps the provided publisher in an instance of AnyPublisher, hiding the fact that the publisher is actually a PassthroughSubject. This is also necessary because you cannot specialize the Publisher protocol, e.g., you cannot define the type as Publisher<UIImage, Never>.
+
+- To prove that publisher is type-erased and cannot be used to send new values, add this code to the example.
+
+```swift
+publisher.send(1)
+```
+- You get the error Value of type 'AnyPublisher<Int, Never>' has no member 'send'. Comment out that line of code before moving on.
+
+
+# Operators
+
+- **Transforming Operators**: Before a subscriber receives values from a publisher, you’ll often want to manipulate those values in some way. One of the most common things you’ll want to do is transform those values into some form that is ideal for use by the subscriber. By the end of this chapter you’ll be transforming all the things.
+
+- **Filtering Operators** :you'll learn about filtering values from Combine publishers, so you can easily control the values published by the upstream and only deal with the ones you care about.
+
+- **Combining Operators** : Publishers are extremely powerful, but they're even more powerful when composed together! This chapter will teach you about Combine's combining operators which let you take multiple publishers and create meaningful logical relationships between them.
+
+- **Time Manipulation Operators** : A large part of asynchronous programming relates to processing values over time. This chapter goes into the details of performing complex time-based tasks that would be hard to do without Combine.
+
+- **Sequence Operators** : When you think about it, publishers are merely sequences. As such, there are many useful operators that let you target specific values, or gather information about the sequence as a whole, which you'll learn about in this chapter.
+
+# Transforming Operators
+
+## Operators are publishers
+
+- In Combine, methods that perform an operation on values coming from a publisher are called operators.
+- Each Combine operator actually returns a publisher. Generally speaking, that publisher receives the upstream values, manipulates the data, and then sends that data downstream. To streamline things conceptually, the focus will be on using the operator and working with its output. Unless an operator’s purpose is to handle errors, if it receives an error from an upstream publisher, it will just publish that error downstream.
+
+## Collecting values **collect()**
+- The `collect` operator provides a convenient way to transform a stream of individual values from a publisher into an array of those values
+
+```swift
+example(of: "collect") {
+["A", "B", "C", "D", "E"].publisher
+.sink(receiveCompletion: { print($0) },
+receiveValue: { print($0) })
+.store(in: &subscriptions)
+}
+```
+- This is not using the collect operator yet. Run the playground, and you’ll see each value is emitted and printed individually followed by the completion:
+
+> ——— Example of: collect ———
+> A
+> B
+> C
+> D
+> E
+> finished
+
+- Now insert the use of collect before the sink. Your code should look like this:
+
+```swift
+["A", "B", "C", "D", "E"].publisher
+.collect()
+.sink(receiveCompletion: { print($0) },
+receiveValue: { print($0) })
+.store(in: &subscriptions)
+```
+> ——— Example of: collect ———
+> ["A", "B", "C", "D", "E"]
+> finished
+
+> **Note**: Be careful when working with collect() and other buffering operators that do not require specifying a count or limit. They will use an unbounded amount of memory to store received values.
+
+- There are a few variations of the collect operator. For example, you can specify that you only want to receive up to a certain number of values.
+
+- Replace the following line:
+```swift
+.collect()
+```
+- with:
+```swift
+.collect(2)
+```
+- Run the playground, and you’ll see the following output:
+> ——— Example of: collect ———
+> ["A", "B"]
+> ["C", "D"]
+> ["E"]
+> finished
+
+
+## Mapping values **map(_:)**
+
+- The first you’ll learn about is map, which works just like Swift’s standard map, except that it operates on values emitted from a publisher. In the marble diagram, map takes a closure that multiplies each value by 2.
+
+- Add this new example to your playground:
+
+```swift
+example(of: "map") {
+    // 1
+    let formatter = NumberFormatter()
+    formatter.numberStyle = .spellOut
+    // 2
+    [123, 4, 56].publisher
+    // 3
+    .map {
+    formatter.string(for: NSNumber(integerLiteral: $0)) ?? ""
+    }
+    .sink(receiveValue: { print($0) })
+    .store(in: &subscriptions)
+}
+```
+1. Create a number formatter to spell out each number.
+2. Create a publisher of integers.
+3. Use map, passing a closure that gets upstream values and returns the result of using the formatter to return the number’s spelled out string.
+
+> ——— Example of: map ———
+> one hundred twenty-three
+> four
+> fifty-six
+
+## Map key paths
+- The map family of operators also includes three versions that can map into one, two, or three properties of a value using key paths. Their signatures are as follows:
+
+• map<T>(_:)
+• map<T0, T1>(_:_:)
+• map<T0, T1, T2>(_:_:_:)
+
+- The T represents the type of values found at the given key paths.
+
+```swift
+example(of: "map key paths") {
+    // 1
+    let publisher = PassthroughSubject<Coordinate, Never>()
+    // 2
+    publisher
+    // 3
+    .map(\.x, \.y)
+    .sink(receiveValue: { x, y in
+    // 4
+    print(
+    "The coordinate at (\(x), \(y)) is in quadrant",
+    quadrantOf(x: x, y: y)
+    )
+    })
+    .store(in: &subscriptions)
+    // 5
+    publisher.send(Coordinate(x: 10, y: -8))
+    publisher.send(Coordinate(x: 0, y: 5))
+}
+```
+
+1. Create a publisher of Coordinates that will never emit an error.
+2. Begin a subscription to the publisher.
+3. Map into the x and y properties of Coordinate using their key paths.
+4. Print a statement that indicates the quadrant of the provide x and y values.
+5. Send some coordinates through the publisher.
+
+- Run the playground and the output from this subscription will be the following:
+
+>——— Example of: map key paths ———
+>The coordinate at (10, -8) is in quadrant 4
+>The coordinate at (0, 5) is in quadrant boundary
+
+## tryMap(_:)
+
+- Several operators, including map, have a counterpart try operator that will take a closure that can throw an error. If you throw an error, it will emit that error downstream. Add this example to the playground:
+
+```swift
+example(of: "tryMap") {
+    // 1
+    Just("Directory name that does not exist")
+    // 2
+    .tryMap { try
+    FileManager.default.contentsOfDirectory(atPath: $0) }
+    // 3
+    .sink(receiveCompletion: { print($0) },
+    receiveValue: { print($0) })
+    .store(in: &subscriptions)
+}
+```
+1. Create a publisher of a string representing a directory name that does not exist.
+2. Use tryMap to attempt to get the contents of that nonexistent directory.
+3. Receive and print out any values or completion events.
+
+- Notice that you still need to use the try keyword when calling a throwing method.
+- Run the playground and observe that tryMap outputs a failure completion event with the appropriate “folder doesn’t exist” error (output abbreviated):
+
+> ——— Example of: tryMap ———
+>failure(..."The folder “Directory name that does not exist” doesn't exist."...)
+
+## Flattening publishers
+
