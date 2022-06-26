@@ -253,3 +253,260 @@ playground (for example, _ = just.sink...). However, one caveat: if you
 don’t store a subscription in full projects, that subscription will cancel as soon
 as the program flow exits the scope in which it was created!
 
+
+- Take a look at the Publisher protocol and one of its most crucial extensions:
+
+```swift
+public protocol Publisher {
+    // 1
+    associatedtype Output
+    // 2
+    associatedtype Failure : Error
+    // 4
+    func receive<S>(subscriber: S)
+    where S: Subscriber,
+    Self.Failure == S.Failure,
+    Self.Output == S.Input
+}
+extension Publisher {
+    // 3
+    public func subscribe<S>(_ subscriber: S)
+    where S : Subscriber,
+    Self.Failure == S.Failure,
+    Self.Output == S.Input
+}
+
+```
+
+- Here’s a closer look:
+1- The type of values that the publisher can produce.
+2- The type of error a publisher may produce, or Never if the publisher is guaranteed to not produce an error.
+3- A subscriber calls subscribe(_:) on a publisher to attach to it.
+4- The implementation of subscribe(_:) will call receive(subscriber:) to attach the subscriber to the publisher, i.e., create a subscription.
+
+- The associated types are the publisher’s interface that a subscriber must match in order to create a subscription.
+
+- look at the Subscriber protocol: 
+
+```swift
+public protocol Subscriber: CustomCombineIdentifierConvertible {
+    // 1
+    associatedtype Input
+    // 2
+    associatedtype Failure: Error
+    // 3
+    func receive(subscription: Subscription)
+    // 4
+    func receive(_ input: Self.Input) -> Subscribers.Demand
+    // 5
+    func receive(completion: Subscribers.Completion<Self.Failure>)
+} 
+```
+- Here’s a closer look:
+1- The type of values a subscriber can receive.
+2- The type of error a subscriber can receive; or Never if the subscriber won’t receive an error. 
+3- The publisher calls receive(subscription:) on the subscriber to give it the subscription.
+4- The publisher calls receive(_:) on the subscriber to send it a new value that it just published.
+5- The publisher calls receive(completion:) on the subscriber to tell it that it has finished producing values, either normally or due to an error.
+
+
+- The connection between the publisher and the subscriber is the subscription. Here’s the Subscription protocol:
+```swift
+public protocol Subscription: Cancellable, CustomCombineIdentifierConvertible {
+    func request(_ demand: Subscribers.Demand)
+}
+```
+- The subscriber calls request(_:) to indicate it is willing to receive more values, up to a max number or unlimited.
+
+> **Note**: The concept of a subscriber stating how many values it’s willing to receive is known as backpressure management. Without it, or some other strategy, a subscriber could get flooded with more values from the publisher than it can handle, and this can lead to problems. Backpressure is also covered in depth in the next.
+
+- In Subscriber, notice that receive(_:) returns a Demand. Even though the max number of values a subscriber is willing to receive is specified when initially calling subscription.request(_:) in receive(_:), you can adjust that max each time a new value is received.
+
+> Note: Adjusting max in Subscriber.receive(_:) is additive, i.e., the new max value is added to the current max. The max value must be positive, and passing a negative value will result in a fatalError. This means that you can increase the original max each time a new value is received, but you cannot decrease it.
+
+
+## Creating a custom subscriber
+
+```swift
+example(of: "Custom Subscriber") {
+    // 1
+    let publisher = (1...6).publisher
+    // 2
+    final class IntSubscriber: Subscriber {
+        // 3
+        typealias Input = Int
+        typealias Failure = Never
+        // 4
+        func receive(subscription: Subscription) {
+            subscription.request(.max(3))
+        }
+        // 5
+        func receive(_ input: Int) -> Subscribers.Demand {
+            print("Received value", input)
+            return .none
+        }
+        // 6
+        func receive(completion: Subscribers.Completion<Never>) {
+            print("Received completion", completion)
+        }
+    }
+    
+    let subscriber = IntSubscriber()
+    publisher.subscribe(subscriber)
+    
+}
+```
+- What you do here is: 
+1- Create a publisher of integers via the range’s publisher property.
+2- Define a custom subscriber, IntSubscriber.
+3- Implement the type aliases to specify that this subscriber can receive integer inputs and will never receive errors.
+4- Implement the required methods, beginning with receive(subscription:), which is called by the publisher; and in that method, call .request(_:) on the subscription specifying that the subscriber is willing to receive up to three values upon subscription.
+
+5- Print each value as it’s received and return .none, indicating that the subscriber will not adjust its demand; .none is equivalent to .max(0).
+6- Print the completion event.
+
+- In this code, you create a subscriber that matches the Output and Failure types of the publisher. You then tell the publisher to subscribe, or attach, the subscriber.
+
+- Run the playground. You’ll see the following printed to the console:
+
+> ——— Example of: Custom Subscriber ———
+> Received value 1
+> Received value 2
+> Received value 3
+
+- You did not receive a completion event. This is because the publisher has a finite number of values, and you specified a demand of .max(3).
+
+- In your custom subscriber’s receive(_:), try changing .none to .unlimited, so your receive(_:) method looks like this:
+
+```swift
+func receive(_ input: Int) -> Subscribers.Demand {
+    print("Received value", input)
+    return .unlimited
+}
+```
+
+- Run the playground again. This time you’ll see that all of the values are received and printed, along with the completion event:
+
+> ——— Example of: Custom Subscriber ———
+> Received value 1
+> Received value 2
+> Received value 3
+> Received value 4
+> Received value 5
+> Received value 6
+> Received completion finished
+
+- Try changing .unlimited to .max(1) and run the playground again.
+
+- You’ll see the same output as when you returned .unlimited, because each time you receive an event, you specify that you want to increase the max by 1.
+
+- Change .max(1) back to .none, and change the definition of publisher to an array of strings instead. Replace:
+
+```swift
+let publisher = (1...6).publisher
+```
+with 
+
+```swift
+let publisher = ["A", "B", "C", "D", "E", "F"].publisher
+```
+
+- Run the playground. You get an error that the subscribe method requires types String and IntSubscriber.Input (i.e., Int) to be equivalent. You get this error because the Output and Failure associated types of a publisher must match the Input and Failure types of a subscriber in order for a subscription between the two to be created.
+
+- Change the publisher definition back to its original range of integers to resolve the error.
+
+## Hello Future
+- Much like you can use Just to create a publisher that emits a single value to a subscriber and then complete, a Future can be used to asynchronously produce a single result and then complete. Add this new example to your playground:
+
+```swift
+example(of: "Future") {
+    func futureIncrement(
+        integer: Int,
+        afterDelay delay: TimeInterval) -> Future<Int, Never> {
+        
+    }
+}
+```
+- Here, you create a factory function that returns a future of type Int and Never; meaning, it will emit an integer and never fail.
+
+- You also add a subscriptions set in which you’ll store the subscriptions to the future in the example. For long-running asynchronous operations, not storing the subscription will result in the cancelation of the subscription as soon as the current code scope ends. In the case of a Playground, that would be immediately.
+
+- Next, fill the function’s body to create the future:
+
+```swift
+Future<Int, Never> { promise in
+    DispatchQueue.global().asyncAfter(deadline: .now() + delay) {
+        promise(.success(integer + 1))
+    }
+}
+```
+- This code defines the future, which creates a promise that you then execute using the values specified by the caller of the function to increment the integer after the delay.
+
+- A Future is a publisher that will eventually produce a single value and finish, or it will fail. It does this by invoking a closure when a value or error is made available, and that closure is referred to as a promise. Command-click on Future and choose Jump to Definition. You’ll see the following:
+
+```swift
+final public class Future<Output, Failure> : Publisher
+where Failure: Error {
+    public typealias Promise = (Result<Output, Failure>) -> Void
+    ...
+}
+```
+
+- Promise is a type alias to a closure that receives a Result containing either a single value published by the Future, or an error.
+
+- Head back to the main playground page, and add the following code after the definition of futureIncrement:
+
+```swift
+// 1
+let future = futureIncrement(integer: 1, afterDelay: 3)
+// 2
+future
+    .sink(receiveCompletion: { print($0) },
+    receiveValue: { print($0) })
+    .store(in: &subscriptions)
+```
+1- Create a future using the factory function you created earlier, specifying to increment the integer you passed after a three-second delay.
+2- Subscribe to and print the received value and completion event, and store the resulting subscription in the subscriptions set. You’ll learn more about storing subscriptions in a collection later in this chapter, so don’t worry if you don’t entirely understand that portion of the example.
+
+- Run the playground. You’ll see the example title printed, followed by the output of the future after a three-second delay:
+
+> ——— Example of: Future ———
+2
+finished
+
+- Add a second subscription to the future by entering the following code in the playground:
+
+```swift
+future
+    .sink(receiveCompletion: { print("Second", $0) },
+    receiveValue: { print("Second", $0) })
+    .store(in: &subscriptions)
+```
+- Before running the playground, insert the following print statement immediately before the DispatchQueue block in the futureIncrement function:
+
+```swift
+print("Original")
+```
+
+- Run the playground. After the specified delay, the second subscription receives the same value. The future does not re-execute its promise; instead, it shares or replays its output.
+
+> ——— Example of: Future ———
+Original
+2
+finished
+Second 2
+Second finished
+
+
+- Also, Original is printed right away before the subscriptions occur. This happens because a future executes as soon as it is created. It does not require a subscriber like regular publishers.
+
+- In the last few examples, you’ve been working with publishers that have a finite number of values to publish, which are sequentially and synchronously published.
+
+- The notification center example you started with is an example of a publisher that can keep on publishing values indefinitely and asynchronously, provided:
+
+1- The underlying notification sender emits notifications.
+2- There are subscribers to the specified notification.
+
+- What if there was a way that you could do the same thing in your own code? Well, it turns out, there is! Before moving on, comment out the entire "Future" example, so the future isn’t invoked every time you run the playground — otherwise its delayed output will be printed after the last example.
+
+## Hello Subject
