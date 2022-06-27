@@ -962,3 +962,343 @@ example(of: "tryMap") {
 
 ## Flattening publishers
 
+- The flatMap operator can be used to flatten multiple upstream publishers into a single downstream publisher — or more specifically, flatten the emissions from those publishers.
+- A common use case for flatMap in Combine is when you want to subscribe to properties of values emitted by a publisher that are themselves publishers.
+
+- Time to implement an example to see this in action. Start by taking a look at the code in Sources/SupportCode.swift. It includes the definition of a Chatter structure with two properties:
+1. name is a regular string.
+2. message is a CurrentValueSubject subject that is initialized with the message string passed in.
+
+```swift
+public struct Chatter {
+    public let name: String
+    public let message: CurrentValueSubject<String, Never>
+    public init(name: String, message: String) {
+        self.name = name
+        self.message = CurrentValueSubject(message)
+    }
+}
+```
+
+```swift
+example(of: "flatMap") {
+    // 1
+    let charlotte = Chatter(name: "Charlotte", message: "Hi, I'm
+    Charlotte!")
+    let james = Chatter(name: "James", message: "Hi, I'm James!")
+    // 2
+    let chat = CurrentValueSubject<Chatter, Never>(charlotte)
+    // 3
+    chat
+    .sink(receiveValue: { print($0.message.value) })
+    .store(in: &subscriptions)
+}
+```
+
+- From the top, you:
+1. Create two instances of Chatter: charlotte and james.
+
+2. Create a chat publisher initialized with charlotte.
+
+3. Subscribe to chat and print out the message of any received Chatter structure.
+
+- Run the playground, and as you might expect, Charlotte’s message is printed out:
+> ——— Example of: flatMap ———
+> Charlotte wrote: Hi, I'm Charlotte!
+
+- Now add this code to the example:
+
+```swift
+// 4
+charlotte.message.value = "Charlotte: How's it going?"
+// 5
+chat.value = james
+```
+- You don’t see Charlotte’s new message, but you do see James’ initial message. That’s because you’re subscribed to chat, which is a Chatter publisher. You are not subscribed to the message publisher property of each emitted Chatter. What if you wanted to subscribe to the message of every chat? You can use flatMap.
+
+- Find the following code:
+```swift
+chat
+.sink(receiveValue: { print($0.message.value) })
+.store(in: &subscriptions)
+```
+- And replace it with:
+
+```swift
+chat
+// 6
+.flatMap { $0.message }
+// 7
+.sink(receiveValue: { print($0) })
+.store(in: &subscriptions)
+```
+6. Flat map into the Chatter structure message publisher.
+
+7. Change the handler to print the value received, which is now a string, not a Chatter instance.
+
+- Run the playground again, and now you’ll see Charlotte’s new message printed.
+
+> Hi, I'm Charlotte!
+> Charlotte: How's it going?
+> Hi, I'm James!
+
+- Now add the following code to the example, which changes each Chatter’s message value:
+
+> james.message.value = "James: Doing great. You?"
+>charlotte.message.value = "Charlotte: I'm doing fine thanks."
+
+- Run the playground, and you may be surprised by what you see:
+
+> James: Doing great. You?
+> Charlotte: I'm doing fine thanks.
+
+- To help you manage flatMap’s memory footprint, you can optionally specify how many publishers flatMap will receive and buffer using its maxPublishers parameter.
+
+- Find the following line:
+
+```swift
+.flatMap { $0.message }
+```
+- And replace it with:
+
+```swift
+.flatMap(maxPublishers: .max(2)) { $0.message }
+```
+
+- You specify that flatMap will receive a maximum of two upstream publishers. It will ignore any additional publishers. If not specified, maxPublishers defaults to `.unlimited`.
+
+- You previously set flatMap’s maxPublishers parameter to two. Now add the following code to the bottom of the example to see how this affects the output:
+
+```swift
+// 8
+let morgan = Chatter(name: "Morgan",
+message: "Hey guys, what are you up to?")
+// 9
+chat.value = morgan
+// 10
+charlotte.message.value = "Did you hear something?"
+```
+8. Create a third Chatter instance.
+9. Add that Chatter onto the chat publisher.
+10. Change Charlotte’s message.
+
+- Run the playground and see if you were right:
+
+> ——— Example of: flatMap ———
+> Hi, I'm Charlotte!
+> Charlotte: How's it going?
+> Hi, I'm James!
+> James: Doing great. You?
+> Charlotte: I'm doing fine thanks.
+> Did you hear something?
+
+- Morgan’s message is not printed, because flatMap will only receive up to a max of two publishers.
+
+## replaceNil(with:)
+- replaceNil will receive optional values and replace nils with the value you specify:
+
+- Add this new example to your playground:
+```swift
+example(of: "replaceNil") {
+    // 1
+    ["A", nil, "C"].publisher
+    .replaceNil(with: "-") // 2
+    .sink(receiveValue: { print($0) }) // 3
+    .store(in: &subscriptions)
+}
+```
+
+> ——— Example of: replaceNil ———
+> Optional("A")
+> Optional("-")
+> Optional("C")
+
+- The optional values were not converted to non-optional ones. True to its name, replaceNil(with:) replaced a nil with a non-nil value. One way that you could convert the output from replaceNil to a non-optional value is by inserting the use of map to force-unwrap it. Do so by changing your code to the following:
+
+> ["A", nil, "C"].publisher
+> .replaceNil(with: "-")
+> .map { $0! }
+> .sink(receiveValue: { print($0) })
+> .store(in: &subscriptions)
+
+## replaceEmpty(with:)
+- You can use the replaceEmpty(with:) operator to replace — or really, insert — a value if a publisher completes without emitting a value.
+
+```swift
+
+example(of: "replaceEmpty(with:)") {
+    // 1
+    let empty = Empty<Int, Never>()
+    // 2
+    empty
+    .sink(receiveCompletion: { print($0) },
+    receiveValue: { print($0) })
+    .store(in: &subscriptions)
+}
+
+```
+1. Create an empty publisher that immediately emits a completion event.
+2. Subscribe to it, and print received events.
+
+- The Empty publisher type can be used to create a publisher that immediately emits a .finished completion event. It can also be configured to never emit anything by passing false to its completeImmediately parameter, which is true by default. This publisher is useful for demo or testing purposes, or when all you want to do is signal completion of some task to a subscriber. Run the playground and its completion event is printed:
+
+> ——— Example of: replaceEmpty ———
+> finished
+
+- Now, insert this line of code before calling sink:
+
+```swift
+.replaceEmpty(with: 1)
+```
+
+- Run the playground again, and this time you get a 1 before the completion:
+
+> 1
+> finished
+
+## scan(_:_:)
+
+- A great example of this in the transforming category is scan. It will provide the current value emitted by an upstream publisher to a closure, along with the last value returned by that closure.
+
+- scan begins by storing a starting value of 0. As it receives each value from the publisher, it adds it to the previously stored value, and then stores and emits the result:
+
+> **Note**: If you are using the full project to enter and run this code, there’s no straightforward way to plot the output — as is possible in a playground. Instead, you can print the output by changing the sink code in the example below to .sink(receiveValue: { print($0) }).
+
+- For a practical example of how to use scan, add this new example to your playground:
+
+```swift
+
+example(of: "scan") {
+    // 1
+    var dailyGainLoss: Int { .random(in: -10...10) }
+    // 2
+    let august2019 = (0..<22)
+    .map { _ in dailyGainLoss }
+    .publisher
+    // 3
+    august2019
+    .scan(50) { latest, current in
+    max(0, latest + current)
+    }
+    .sink(receiveValue: { _ in })
+    .store(in: &subscriptions)
+}
+
+```
+1. Create a computed property that generates a random integer between -10 and 10.
+2. Use that generator to create a publisher from an array of random integers representing fictitious daily stock price changes for a month.
+3. Use scan with a starting value of 50, and then add each daily change to the running stock price. The use of max keeps the price non-negative — thankfully stock prices can’t fall below zero!
+
+
+# Filtering Operators
+
+## Filtering basics
+
+```swift
+example(of: "filter") {
+// 1
+let numbers = (1...10).publisher
+// 2
+numbers
+.filter { $0.isMultiple(of: 3) }
+.sink(receiveValue: { n in
+    print("\(n) is a multiple of 3!")
+})
+.store(in: &subscriptions)
+}
+```
+1. Create a new publisher, which will emit a finite number of values — 1 through 10, and then complete, using the publisher property on Sequence types.
+2. Use the filter operator, passing in a predicate where you only allow through numbers that are multiples of three.
+
+> ——— Example of: filter ———
+> 3 is a multiple of 3!
+> 6 is a multiple of 3!
+> 9 is a multiple of 3!
+
+
+## removeDuplicates()
+
+```swift
+example(of: "removeDuplicates") {
+// 1
+let words = "hey hey there! want to listen to mister mister ?"
+.components(separatedBy: " ")
+.publisher
+// 2
+words
+.removeDuplicates()
+.sink(receiveValue: { print($0) })
+.store(in: &subscriptions)
+}
+```
+1. Separate a sentence into an array of words (e.g., Array<String>) and then create a new publisher to emit these words.
+2. Apply removeDuplicates() to your words publisher
+
+- Run your playground and take a look at the debug console:
+
+> ——— Example of: removeDuplicates ———
+> hey
+> there!
+> want
+> to
+> listen
+> to
+> mister
+> ?
+
+> **Note**: What about values that don’t conform to Equatable? Well, removeDuplicates has another overload that takes a closure with two values, from which you'll return a Bool to indicate whether the values are equal or not.
+
+
+** Compacting and ignoring
+
+```swift
+example(of: "compactMap") {
+    // 1
+    let strings = ["a", "1.24", "3",
+    "def", "45", "0.23"].publisher
+    // 2
+    strings
+    .compactMap { Float($0) }
+    .sink(receiveValue: {
+    // 3
+    print($0)
+    })
+    .store(in: &subscriptions)
+}
+```
+1. Create a publisher that emits a finite list of strings.
+2. Use compactMap to attempt to initialize a Float from each individual string. If Float’s initializer doesn’t know how to convert the provided string, it returns nil.
+3. Only print strings that have been successfully converted to Floats.
+
+> ——— Example of: compactMap ———
+> 1.24
+> 3.0
+> 45.0
+> 0.23
+
+- All right, why don’t you take a quick break from all these values... who cares about those, right? Sometimes, all you want to know is that the publisher has finished emitting values, disregarding the actual values. When such a scenario occurs, you can use the ignoreOutput operator:
+
+## ignoreOutput
+
+```swift
+example(of: "ignoreOutput") {
+    // 1
+    let numbers = (1...10_000).publisher
+    // 2
+    numbers
+    .ignoreOutput()
+    .sink(receiveCompletion: { print("Completed with: \($0)") },
+    receiveValue: { print($0) })
+    .store(in: &subscriptions)
+}
+```
+
+1. Create a publisher emitting 10,000 values from 1 through 10,000.
+
+2. Add the ignoreOutput operator, which omits all values and emits only the completion event to the consumer.
+
+> ——— Example of: ignoreOutput ———
+> Completed with: finished
+
+## Finding values
+
