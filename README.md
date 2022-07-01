@@ -1302,3 +1302,2071 @@ example(of: "ignoreOutput") {
 
 ## Finding values
 
+### First 
+
+```swift
+example(of: "first(where:)") {
+    // 1
+    let numbers = (1...9).publisher
+    // 2
+    numbers
+    .first(where: { $0 % 2 == 0 })
+    .sink(receiveCompletion: { print("Completed with: \($0)") },
+    receiveValue: { print($0) })
+    .store(in: &subscriptions)
+}
+```
+
+> ——— Example of: first(where:) ———
+> 2
+> Completed with: finished
+
+> Note: You can use the print operator anywhere in your operator chain to see exactly what events occur at that point.
+
+```swift
+.print("numbers")
+```
+> ——— Example of: first(where:) ———
+> numbers: receive subscription: (1...9)
+> numbers: request unlimited
+> numbers: receive value: (1)
+> numbers: receive value: (2)
+> numbers: receive cancel
+> 2
+> Completed with: finished
+
+
+### Last
+
+```swift
+example(of: "last(where:)") {
+    // 1
+    let numbers = (1...9).publisher
+    // 2
+    numbers
+    .last(where: { $0 % 2 == 0 })
+    .sink(receiveCompletion: { print("Completed with: \($0)") },
+    receiveValue: { print($0) })
+    .store(in: &subscriptions)
+}
+```
+> ——— Example of: last(where:) ———
+> 8
+> Completed with: finished
+
+
+```swift
+
+example(of: "last(where:)") {
+    let numbers = PassthroughSubject<Int, Never>()
+    
+    numbers
+    .last(where: { $0 % 2 == 0 })
+    .sink(receiveCompletion: { print("Completed with: \($0)") },
+    receiveValue: { print($0) })
+    .store(in: &subscriptions)
+    numbers.send(1)
+    numbers.send(2)
+    numbers.send(3)
+    numbers.send(4)
+    numbers.send(5)
+    
+    numbers.send(completion: .finished)
+}
+
+```
+> ——— Example of: last(where:) ———
+> 4
+> Completed with: finished
+
+## Dropping values
+
+### Drop First
+
+```swift
+example(of: "dropFirst") {
+    // 1
+    let numbers = (1...10).publisher
+    // 2
+    numbers
+    .dropFirst(8)
+    .sink(receiveValue: { print($0) })
+    .store(in: &subscriptions)
+}
+```
+> ——— Example of: dropFirst ———
+> 9
+> 10
+
+
+```swift
+
+example(of: "drop(while:)") {
+    // 1
+    let numbers = (1...10).publisher
+    // 2
+    numbers
+    .drop(while: { $0 % 5 != 0 })
+    .sink(receiveValue: { print($0) })
+    .store(in: &subscriptions)
+}
+
+```
+> ——— Example of: drop(while:) ———
+> 5
+> 6
+> 7
+> 8
+> 9
+> 10
+
+
+```swift
+example(of: "drop(untilOutputFrom:)") {
+    // 1
+    let isReady = PassthroughSubject<Void, Never>()
+    let taps = PassthroughSubject<Int, Never>()
+    // 2
+    taps
+    .drop(untilOutputFrom: isReady)
+    .sink(receiveValue: { print($0) })
+    .store(in: &subscriptions)
+    // 3
+    (1...5).forEach { n in
+    taps.send(n)
+    if n == 3 {
+    isReady.send()
+    }
+    }
+}
+```
+
+> ——— Example of: drop(untilOutputFrom:) ———
+> 4
+> 5
+
+
+## Limiting values
+
+```swift
+example(of: "prefix") {
+    // 1
+    let numbers = (1...10).publisher
+    // 2
+    numbers
+    .prefix(2)
+    .sink(receiveCompletion: { print("Completed with: \($0)") },
+    receiveValue: { print($0) })
+    .store(in: &subscriptions)
+}
+```
+
+> ——— Example of: prefix ———
+> 1
+> 2
+> Completed with: finished
+
+```swift
+
+example(of: "prefix(while:)") {
+    // 1
+    let numbers = (1...10).publisher
+    // 2
+    numbers
+    .prefix(while: { $0 < 3 })
+    .sink(receiveCompletion: { print("Completed with: \($0)") },
+    receiveValue: { print($0) })
+    .store(in: &subscriptions)
+}
+
+```
+> ——— Example of: prefix(while:) ———
+> 1
+> 2
+> Completed with: finished
+
+```swift
+
+example(of: "prefix(untilOutputFrom:)") {
+    // 1
+    let isReady = PassthroughSubject<Void, Never>()
+    let taps = PassthroughSubject<Int, Never>()
+    // 2
+    taps
+        .prefix(untilOutputFrom: isReady)
+        .sink(receiveCompletion: { print("Completed with: \($0)") },
+        receiveValue: { print($0) })
+        .store(in: &subscriptions)
+    // 3
+    (1...5).forEach { n in
+            taps.send(n)
+            if n == 2 {
+            isReady.send()
+        }       
+    }
+}
+
+```
+> ——— Example of: prefix(untilOutputFrom:) ———
+> 1
+> 2
+> Completed with: finished
+
+
+# Combining Operators
+
+## prepend(Output...)
+
+```swift
+example(of: "prepend(Output...)") {
+    // 1
+    let publisher = [3, 4].publisher
+    // 2
+    publisher
+    .prepend(1, 2)
+    .sink(receiveValue: { print($0) })
+    .store(in: &subscriptions)
+}
+```
+
+> ——— Example of: prepend(Output...) ———
+> 1
+> 2
+> 3
+> 4
+
+## prepend(Sequence)
+
+```swift
+
+example(of: "prepend(Sequence)") {
+    // 1
+    let publisher = [5, 6, 7].publisher
+    // 2
+    publisher
+    .prepend([3, 4])
+    .prepend(Set(1...2))
+    .sink(receiveValue: { print($0) })
+    .store(in: &subscriptions)
+}
+
+```
+
+> ——— Example of: prepend(Sequence) ———
+> 1
+> 2
+> 3
+> 4
+> 5
+> 6
+> 7
+
+> Note: An important fact to remember about Sets, as opposed to Arrays, is that they are unordered, so the order in which the items emit is not guaranteed. This means the first two values in the above example could be either 1 and 2, or 2 and 1.
+
+- After the second prepend:
+
+```swift
+.prepend(Set(1...2))
+```
+- Add the following line:
+```swift
+.prepend(stride(from: 6, to: 11, by: 2))
+```
+> ——— Example of: prepend(Sequence) ———
+> 6
+> 8
+> 10
+> 1
+> 2
+> 3
+> 4
+> 5
+> 6
+> 7
+
+### prepend(Publisher)
+
+```swift
+
+example(of: "prepend(Publisher)") {
+// 1
+let publisher1 = [3, 4].publisher
+let publisher2 = [1, 2].publisher
+// 2
+publisher1
+.prepend(publisher2)
+.sink(receiveValue: { print($0) })
+.store(in: &subscriptions)
+}
+
+```
+
+> ——— Example of: prepend(Publisher) ———
+> 1
+> 2
+> 3
+> 4
+
+```swift
+
+example(of: "prepend(Publisher) #2") {
+// 1
+let publisher1 = [3, 4].publisher
+let publisher2 = PassthroughSubject<Int, Never>()
+// 2
+publisher1
+.prepend(publisher2)
+.sink(receiveValue: { print($0) })
+.store(in: &subscriptions)
+// 3
+publisher2.send(1)
+publisher2.send(2)
+}
+
+```
+> ——— Example of: prepend(Publisher) #2 ———
+> 1
+> 2
+
+- After the following line:
+
+```swift
+publisher2.send(2)
+```
+
+- Add this one:
+
+```swift
+publisher2.send(completion: .finished)
+```
+
+> ——— Example of: prepend(Publisher) #2 ———
+> 1
+> 2
+> 3
+> 4
+
+## append(Output...)
+
+```swift
+
+example(of: "append(Output...)") {
+    // 1
+    let publisher = [1].publisher
+    // 2
+    publisher
+    .append(2, 3)
+    .append(4)
+    .sink(receiveValue: { print($0) })
+    .store(in: &subscriptions)
+}
+
+```
+
+> ——— Example of: append(Output...) ———
+> 1
+> 2
+> 3
+> 4
+
+```swift
+
+example(of: "append(Output...) #2") {
+    // 1
+    let publisher = PassthroughSubject<Int, Never>()
+    publisher
+    .append(3, 4)
+    .append(5)
+    .sink(receiveValue: { print($0) })
+    .store(in: &subscriptions)
+    // 2
+    publisher.send(1)
+    publisher.send(2)
+}
+
+```
+
+> ——— Example of: append(Output...) #2 ———
+> 1
+> 2
+
+```swift
+publisher.send(completion: .finished)
+```
+
+> ——— Example of: append(Output...) #2 ———
+> 1
+> 2
+> 3
+> 4 
+> 5
+
+
+### append(Sequence)
+
+```swift
+example(of: "append(Sequence)") {
+    // 1
+    let publisher = [1, 2, 3].publisher
+    publisher
+    .append([4, 5]) // 2
+    .append(Set([6, 7])) // 3
+    .append(stride(from: 8, to: 11, by: 2)) // 4
+    .sink(receiveValue: { print($0) })
+    .store(in: &subscriptions)
+}
+```
+
+> ——— Example of: append(Sequence) ———
+> 1
+> 2
+> 3
+> 4
+> 5
+> 7
+> 6
+> 8
+> 10
+
+### append(Publisher)
+
+```swift
+example(of: "append(Publisher)") {
+// 1
+let publisher1 = [1, 2].publisher
+let publisher2 = [3, 4].publisher
+// 2
+publisher1
+.append(publisher2)
+.sink(receiveValue: { print($0) })
+.store(in: &subscriptions)
+}
+```
+
+> ——— Example of: append(Publisher) ———
+> 1
+> 2
+> 3
+> 4
+
+### switchToLatest
+
+- switchToLatest is complex but highly useful. It lets you switch entire publisher subscriptions on the fly while canceling the pending publisher subscription, thus switching to the latest one.
+
+```swift
+
+example(of: "switchToLatest") {
+    // 1
+    let publisher1 = PassthroughSubject<Int, Never>()
+    let publisher2 = PassthroughSubject<Int, Never>()
+    let publisher3 = PassthroughSubject<Int, Never>()
+    // 2
+    let publishers = PassthroughSubject<PassthroughSubject<Int,
+    Never>, Never>()
+    // 3
+    publishers
+        .switchToLatest()
+        .sink(receiveCompletion: { _ in print("Completed!") },
+        receiveValue: { print($0) })
+        .store(in: &subscriptions)
+    // 4
+    publishers.send(publisher1)
+    publisher1.send(1)
+    publisher1.send(2)
+    // 5
+    publishers.send(publisher2)
+    publisher1.send(3)
+    publisher2.send(4)
+    publisher2.send(5)
+    // 6
+    publishers.send(publisher3)
+    publisher2.send(6)
+    publisher3.send(7)
+    publisher3.send(8)
+    publisher3.send(9)
+    // 7
+    publisher3.send(completion: .finished)
+    publishers.send(completion: .finished)
+}
+
+```
+
+> ——— Example of: switchToLatest ———
+> 1
+> 2
+> 4
+> 5
+> 7
+> 8
+> 9
+> Completed!
+
+
+```swift
+
+example(of: "switchToLatest - Network Request") {
+let url = URL(string: "https://source.unsplash.com/random")!
+    // 1
+    func getImage() -> AnyPublisher<UIImage?, Never> {
+    return URLSession.shared
+    .dataTaskPublisher(for: url)
+    .map { data, _ in UIImage(data: data) }
+    .print("image")
+    .replaceError(with: nil)
+    .eraseToAnyPublisher()
+}
+    // 2
+    let taps = PassthroughSubject<Void, Never>()
+    taps
+    .map { _ in getImage() } // 3
+    .switchToLatest() // 4
+    .sink(receiveValue: { _ in })
+    .store(in: &subscriptions)
+    // 5
+    taps.send()
+    DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+        taps.send()
+    }
+    DispatchQueue.main.asyncAfter(deadline: .now() + 3.1) {
+        taps.send()
+    }
+}
+```
+
+> ——— Example of: switchToLatest - Network Request ———
+> image: receive subscription: (DataTaskPublisher)
+> image: request unlimited
+> image: receive value: (Optional(<UIImage:0x600000364120
+> anonymous {1080, 720}>))
+> image: receive finished
+> image: receive subscription: (DataTaskPublisher)
+> image: request unlimited
+> image: receive cancel
+> image: receive subscription: (DataTaskPublisher)
+> image: request unlimited
+> image: receive value: (Optional(<UIImage:0x600000378d80
+> anonymous {1080, 1620}>))
+> image: receive finished
+
+
+### merge(with:)
+
+```swift
+example(of: "merge(with:)") {
+// 1
+let publisher1 = PassthroughSubject<Int, Never>()
+let publisher2 = PassthroughSubject<Int, Never>()
+// 2
+publisher1
+.merge(with: publisher2)
+.sink(receiveCompletion: { _ in print("Completed") },
+receiveValue: { print($0) })
+.store(in: &subscriptions)
+// 3
+publisher1.send(1)
+publisher1.send(2)
+publisher2.send(3)
+publisher1.send(4)
+publisher2.send(5)
+// 4
+publisher1.send(completion: .finished)
+publisher2.send(completion: .finished)
+}
+
+```
+
+> ——— Example of: merge(with:) ———
+> 1
+> 2
+> 3
+> 4
+> 5
+> Completed
+
+
+### combineLatest
+
+```swift
+
+example(of: "combineLatest") {
+    // 1
+    let publisher1 = PassthroughSubject<Int, Never>()
+    let publisher2 = PassthroughSubject<String, Never>()
+    // 2
+    publisher1
+    .combineLatest(publisher2)
+    .sink(receiveCompletion: { _ in print("Completed") },
+    receiveValue: { print("P1: \($0), P2: \($1)") })
+    .store(in: &subscriptions)
+    // 3
+    publisher1.send(1)
+    publisher1.send(2)
+    publisher2.send("a")
+    publisher2.send("b")
+    publisher1.send(3)
+    publisher2.send("c")
+    // 4
+    publisher1.send(completion: .finished)
+    publisher2.send(completion: .finished)
+}
+
+```
+
+> ——— Example of: combineLatest ———
+> P1: 2, P2: a
+> P1: 2, P2: b
+> P1: 3, P2: b
+> P1: 3, P2: c
+> Completed
+
+### zip
+
+```swift
+example(of: "zip") {
+    // 1
+    let publisher1 = PassthroughSubject<Int, Never>()
+    let publisher2 = PassthroughSubject<String, Never>()
+    // 2
+    publisher1
+    .zip(publisher2)
+    .sink(receiveCompletion: { _ in print("Completed") },
+    receiveValue: { print("P1: \($0), P2: \($1)") })
+    .store(in: &subscriptions)
+    // 3
+    publisher1.send(1)
+    publisher1.send(2)
+    publisher2.send("a")
+    publisher2.send("b")
+    publisher1.send(3)
+    publisher2.send("c")
+    publisher2.send("d")
+    // 4
+    publisher1.send(completion: .finished)
+    publisher2.send(completion: .finished)
+}
+```
+> ——— Example of: zip ———
+> P1: 1, P2: a
+> P1: 2, P2: b
+> P1: 3, P2: c
+> Completed
+
+
+# Time Manipulation Operators
+
+- You’re going to create a publisher that emits one value every second, then delay it by 1.5 seconds and display both timelines simultaneously to compare them. Once you complete the code on this page, you’ll be able to adjust the constants and watch results in the timelines.
+
+> Note: This particular timer is a Combine extension on the Foundation Timer class. It takes a RunLoop and RunLoop.Mode, and not a DispatchQueue as you may expect. Also, timers are part of a class of publishers that are connectable. This means they need to be connected to before they start emitting values. You use autoconnect() which immediately connects upon the first subscription.
+
+```swift
+let valuesPerSecond = 1.0
+let delayInSeconds = 1.5
+
+// 1
+let sourcePublisher = PassthroughSubject<Date, Never>()
+// 2
+let delayedPublisher =
+sourcePublisher.delay(for: .seconds(delayInSeconds), scheduler:
+DispatchQueue.main)
+// 3
+let subscription = Timer
+.publish(every: 1.0 / valuesPerSecond, on: .main, in: .common)
+.autoconnect()
+.subscribe(sourcePublisher)
+
+// 4
+let sourceTimeline = TimelineView(title: "Emitted values (\
+(valuesPerSecond) per sec.):")
+// 5
+let delayedTimeline = TimelineView(title: "Delayed values (with
+a \(delayInSeconds)s delay):")
+// 6
+let view = VStack(spacing: 50) {
+sourceTimeline
+delayedTimeline
+}
+// 7
+PlaygroundPage.current.liveView = UIHostingController(rootView:
+view)
+
+sourcePublisher.displayEvents(in: sourceTimeline)
+delayedPublisher.displayEvents(in: delayedTimeline)
+
+```
+
+
+## Collecting values
+
+```swift
+
+let valuesPerSecond = 1.0
+let collectTimeStride = 4
+
+// 1
+let sourcePublisher = PassthroughSubject<Date, Never>()
+// 2
+let collectedPublisher = sourcePublisher
+.collect(.byTime(DispatchQueue.main, .seconds(collectTimeStrid
+e)))
+
+let subscription = Timer
+.publish(every: 1.0 / valuesPerSecond, on: .main, in: .common)
+.autoconnect()
+.subscribe(sourcePublisher)
+
+let sourceTimeline = TimelineView(title: "Emitted values:")
+let collectedTimeline = TimelineView(title: "Collected values
+(every \(collectTimeStride)s):")
+let view = VStack(spacing: 40) {
+sourceTimeline
+collectedTimeline
+}
+PlaygroundPage.current.liveView = UIHostingController(rootView:
+view)
+
+sourcePublisher.displayEvents(in: sourceTimeline)
+collectedPublisher.displayEvents(in: collectedTimeline)
+
+
+let collectedPublisher = sourcePublisher
+.collect(.byTime(DispatchQueue.main, .seconds(collectTimeStrid
+e)))
+.flatMap { dates in dates.publisher }
+
+```
+
+> Note: you used a simple number to define how to group values together. The overload of collect you just used accepts a strategy for grouping values; in this case, by time.
+
+
+### Collecting values (part 2)
+
+```swift
+
+let collectMaxCount = 2
+
+let collectedPublisher2 = sourcePublisher
+.collect(.byTimeOrCount(DispatchQueue.main,
+.seconds(collectTimeStride),
+collectMaxCount))
+.flatMap { dates in dates.publisher }
+
+let collectedTimeline2 = TimelineView(title: "Collected values
+(at most \(collectMaxCount) every \(collectTimeStride)s):")
+
+let view = VStack(spacing: 40) {
+sourceTimeline
+collectedTimeline
+collectedTimeline2
+}
+
+collectedPublisher2.displayEvents(in: collectedTimeline2)
+
+```
+
+## Debounce
+
+```swift
+
+let subject = PassthroughSubject<String, Never>()
+// 2
+let debounced = subject
+.debounce(for: .seconds(1.0), scheduler: DispatchQueue.main)
+// 3
+.share()
+
+public let typingHelloWorld: [(TimeInterval, String)] = [
+(0.0, "H"),
+(0.1, "He"),
+(0.2, "Hel"),
+(0.3, "Hell"),
+(0.5, "Hello"),
+(0.6, "Hello "),
+(2.0, "Hello W"),
+(2.1, "Hello Wo"),
+(2.2, "Hello Wor"),
+(2.4, "Hello Worl"),
+(2.5, "Hello World")
+]
+
+
+let subjectTimeline = TimelineView(title: "Emitted values")
+let debouncedTimeline = TimelineView(title: "Debounced values")
+let view = VStack(spacing: 100) {
+subjectTimeline
+debouncedTimeline
+}
+PlaygroundPage.current.liveView = UIHostingController(rootView:
+view)
+subject.displayEvents(in: subjectTimeline)
+debounced.displayEvents(in: debouncedTimeline)
+
+let subscription1 = subject
+.sink { string in
+print("+\(deltaTime)s: Subject emitted: \(string)")
+}
+
+let subscription2 = debounced
+.sink { string in
+print("+\(deltaTime)s: Debounced emitted: \(string)")
+}
+
+subject.feed(with: typingHelloWorld)
+
+```
+
+> +0.0s: Subject emitted: H
+> +0.1s: Subject emitted: He
+> +0.2s: Subject emitted: Hel
+> +0.3s: Subject emitted: Hell
+> +0.5s: Subject emitted: Hello
+> +0.6s: Subject emitted: Hello
+> +1.6s: Debounced emitted: Hello
+> +2.1s: Subject emitted: Hello W
+> +2.1s: Subject emitted: Hello Wo
+> +2.4s: Subject emitted: Hello Wor
+> +2.4s: Subject emitted: Hello Worl
+> +2.7s: Subject emitted: Hello World
+> +3.7s: Debounced emitted: Hello World
+
+> Note: One thing to watch out for is the publisher’s completion. If your publisher completes right after the last value was emitted, but before the time configured for debounce elapses, you will never see the last value in the debounced publisher!
+
+## Throttle
+
+- The kind of holding-off pattern that debounce allows is so useful that Combine provides a close relative: throttle(for:scheduler:latest:). It’s very close to debounce, but the differences justify the need for two operators.
+
+```swift
+
+let throttleDelay = 1.0
+
+let subject = PassthroughSubject<String, Never>()
+// 2
+let throttled = subject
+.throttle(for: .seconds(throttleDelay), scheduler:
+DispatchQueue.main, latest: false)
+// 3
+.share()
+
+let subjectTimeline = TimelineView(title: "Emitted values")
+let throttledTimeline = TimelineView(title: "Throttled values")
+let view = VStack(spacing: 100) {
+subjectTimeline
+throttledTimeline
+}
+PlaygroundPage.current.liveView = UIHostingController(rootView:
+view)
+subject.displayEvents(in: subjectTimeline)
+throttled.displayEvents(in: throttledTimeline)
+
+let subscription1 = subject
+.sink { string in
+print("+\(deltaTime)s: Subject emitted: \(string)")
+}
+let subscription2 = throttled
+.sink { string in
+print("+\(deltaTime)s: Throttled emitted: \(string)")
+}
+
+
+subject.feed(with: typingHelloWorld)
+
+
+```
+
+> +0.0s: Subject emitted: H
+> +0.1s: Subject emitted: He
+> +0.2s: Subject emitted: Hel
+> +0.3s: Subject emitted: Hell
+> +0.5s: Subject emitted: Hello
+> +0.6s: Subject emitted: Hello
+> +1.0s: Throttled emitted: H
+> +2.2s: Subject emitted: Hello W
+> +2.2s: Subject emitted: Hello Wo
+> +2.2s: Subject emitted: Hello Wor
+> +2.4s: Subject emitted: Hello Worl
+> +2.7s: Subject emitted: Hello World
+> +3.0s: Throttled emitted: Hello W
+
+
+```swift
+let throttled = subject
+.throttle(for: .seconds(throttleDelay), scheduler:
+DispatchQueue.main, latest: true)
+.share()
+```
+
+> +0.0s: Subject emitted: H
+> +0.1s: Subject emitted: He
+> +0.2s: Subject emitted: Hel
+> +0.3s: Subject emitted: Hell
+> +0.5s: Subject emitted: Hello
+> +0.6s: Subject emitted: Hello
+> +1.0s: Throttled emitted: Hello
+> +2.0s: Subject emitted: Hello W
+> +2.3s: Subject emitted: Hello Wo
+> +2.3s: Subject emitted: Hello Wor
+> +2.6s: Subject emitted: Hello Worl
+> +2.6s: Subject emitted: Hello World
+> +3.0s: Throttled emitted: Hello World
+
+
+## Timing out
+
+```swift
+let subject = PassthroughSubject<Void, Never>()
+// 1
+let timedOutSubject = subject.timeout(.seconds(5), scheduler:
+DispatchQueue.main)
+
+let timeline = TimelineView(title: "Button taps")
+let view = VStack(spacing: 100) {
+// 1
+Button(action: { subject.send() }) {
+Text("Press me within 5 seconds")
+}
+timeline
+}
+PlaygroundPage.current.liveView = UIHostingController(rootView:
+view)
+timedOutSubject.displayEvents(in: timeline)
+
+```
+
+
+## Measuring time
+
+```swift
+
+let subject = PassthroughSubject<String, Never>()
+// 1
+let measureSubject = subject.measureInterval(using:
+DispatchQueue.main)
+
+let subjectTimeline = TimelineView(title: "Emitted values")
+let measureTimeline = TimelineView(title: "Measured values")
+let view = VStack(spacing: 100) {
+subjectTimeline
+measureTimeline
+}
+PlaygroundPage.current.liveView = UIHostingController(rootView:
+view)
+subject.displayEvents(in: subjectTimeline)
+measureSubject.displayEvents(in: measureTimeline)
+
+let subscription1 = subject.sink {
+print("+\(deltaTime)s: Subject emitted: \($0)")
+}
+let subscription2 = measureSubject.sink {
+print("+\(deltaTime)s: Measure emitted: \($0)")
+}
+subject.feed(with: typingHelloWorld)
+
+let subscription2 = measureSubject.sink {
+print("+\(deltaTime)s: Measure emitted: \(Double($0.magnitude)
+/ 1_000_000_000.0)")
+}
+
+let measureSubject2 = subject.measureInterval(using:
+RunLoop.main)
+
+let subscription3 = measureSubject2.sink {
+print("+\(deltaTime)s: Measure2 emitted: \($0)")
+}
+
+```
+
+> +0.0s: Subject emitted: H
+> +0.0s: Measure emitted: Stride(magnitude: 16818353)
+> +0.1s: Subject emitted: He
+> +0.1s: Measure emitted: Stride(magnitude: 87377323)
+> +0.2s: Subject emitted: Hel
+> +0.2s: Measure emitted: Stride(magnitude: 111515697)
+> +0.3s: Subject emitted: Hell
+> +0.3s: Measure emitted: Stride(magnitude: 105128640)
+> +0.5s: Subject emitted: Hello
+> +0.5s: Measure emitted: Stride(magnitude: 228804831)
+> +0.6s: Subject emitted: Hello
+> +0.6s: Measure emitted: Stride(magnitude: 104349343)
+> +2.2s: Subject emitted: Hello W
+> +2.2s: Measure emitted: Stride(magnitude: 1533804859)
+> +2.2s: Subject emitted: Hello Wo
+> +2.2s: Measure emitted: Stride(magnitude: 154602)
+> +2.4s: Subject emitted: Hello Wor
+> +2.4s: Measure emitted: Stride(magnitude: 228888306)
+> +2.4s: Subject emitted: Hello Worl
+> +2.4s: Measure emitted: Stride(magnitude: 138241)
+> +2.7s: Subject emitted: Hello World
+> +2.7s: Measure emitted: Stride(magnitude: 333195273)
+
+
+# Sequence Operators
+
+## min
+
+```swift
+
+example(of: "min") {
+// 1
+let publisher = [1, -50, 246, 0].publisher
+// 2
+publisher
+.print("publisher")
+.min()
+.sink(receiveValue: { print("Lowest value is \($0)") })
+.store(in: &subscriptions)
+}
+
+```
+
+> ——— Example of: min ———
+> publisher: receive subscription: ([1, -50, 246, 0])
+> publisher: request unlimited
+> publisher: receive value: (1)
+> publisher: receive value: (-50)
+> publisher: receive value: (246)
+> publisher: receive value: (0)
+> publisher: receive finished
+> Lowest value is -50
+
+
+```swift
+
+example(of: "min non-Comparable") {
+// 1
+let publisher = ["12345",
+"ab",
+"hello world"]
+.compactMap { $0.data(using: .utf8) } // [Data]
+.publisher // Publisher<Data, Never>
+// 2
+publisher
+.print("publisher")
+.min(by: { $0.count < $1.count })
+.sink(receiveValue: { data in
+// 3
+let string = String(data: data, encoding: .utf8)!
+print("Smallest data is \(string), \(data.count) bytes")
+})
+.store(in: &subscriptions)
+}
+
+```
+
+> ——— Example of: min non-Comparable ———
+> publisher: receive subscription: ([5 bytes, 2 bytes, 11 bytes])
+> publisher: request unlimited
+> publisher: receive value: (5 bytes)
+> publisher: receive value: (2 bytes)
+> publisher: receive value: (11 bytes)
+> publisher: receive finished
+> Smallest data is ab, 2 bytes
+
+
+## max
+
+```swift
+
+example(of: "max") {
+// 1
+let publisher = ["A", "F", "Z", "E"].publisher
+// 2
+publisher
+.print("publisher")
+.max()
+.sink(receiveValue: { print("Highest value is \($0)") })
+.store(in: &subscriptions)
+}
+
+```
+
+> ——— Example of: max ———
+> publisher: receive subscription: (["A", "F", "Z", "E"])
+> publisher: request unlimited
+> publisher: receive value: (A)
+> publisher: receive value: (F)
+> publisher: receive value: (Z)
+> publisher: receive value: (E)
+> publisher: receive finished
+> Highest value is Z
+
+> Note: Exactly like min, max also has a companion max(by:) operator that takes a predicate to determine the maximum value emitted among non-Comparable values.
+
+## first
+
+```swift
+
+example(of: "first") {
+// 1
+let publisher = ["A", "B", "C"].publisher
+// 2
+publisher
+.print("publisher")
+.first()
+.sink(receiveValue: { print("First value is \($0)") })
+.store(in: &subscriptions)
+}
+
+```
+> ——— Example of: first ———
+> publisher: receive subscription: (["A", "B", "C"])
+> publisher: request unlimited
+> publisher: receive value: (A)
+> publisher: receive cancel
+> First value is A
+
+
+```swift
+
+example(of: "first(where:)") {
+// 1
+let publisher = ["J", "O", "H", "N"].publisher
+// 2
+publisher
+.print("publisher")
+.first(where: { "Hello World".contains($0) })
+.sink(receiveValue: { print("First match is \($0)") })
+.store(in: &subscriptions)
+}
+
+```
+
+> ——— Example of: first(where:) ———
+> publisher: receive subscription: (["J", "O", "H", "N"])
+> publisher: request unlimited
+> publisher: receive value: (J)
+> publisher: receive value: (O)
+> publisher: receive value: (H)
+> publisher: receive cancel
+> First match is H
+
+## Last
+
+```swift
+
+example(of: "last") {
+// 1
+let publisher = ["A", "B", "C"].publisher
+// 2
+publisher
+.print("publisher")
+.last()
+.sink(receiveValue: { print("Last value is \($0)") })
+.store(in: &subscriptions)
+}
+
+```
+> ——— Example of: last ———
+> publisher: receive subscription: (["A", "B", "C"])
+> publisher: request unlimited
+> publisher: receive value: (A)
+> publisher: receive value: (B)
+> publisher: receive value: (C)
+> publisher: receive finished
+> Last value is C
+
+
+> Note: Exactly like first, last also has a companion last(where:) operator, which emits the last value emitted by a publisher that matches the specified predicate.
+
+
+## output(at:)
+
+```swift
+
+example(of: "output(at:)") {
+// 1
+let publisher = ["A", "B", "C"].publisher
+// 2
+publisher
+.print("publisher")
+.output(at: 1)
+.sink(receiveValue: { print("Value at index 1 is \($0)") })
+.store(in: &subscriptions)
+}
+
+```
+> ——— Example of: output(at:) ———
+> publisher: receive subscription: (["A", "B", "C"])
+> publisher: request unlimited
+> publisher: receive value: (A)
+> publisher: request max: (1) (synchronous)
+> publisher: receive value: (B)
+> Value at index 1 is B
+> publisher: receive cancel
+
+## output(in:)
+
+```swift
+
+example(of: "output(in:)") {
+// 1
+let publisher = ["A", "B", "C", "D", "E"].publisher
+// 2
+publisher
+.output(in: 1...3)
+.sink(receiveCompletion: { print($0) },
+receiveValue: { print("Value in range: \($0)") })
+.store(in: &subscriptions)
+}
+
+```
+
+> ——— Example of: output(in:) ———
+> Value in range: B
+> Value in range: C
+> Value in range: D
+> finished
+
+
+## count
+
+```swift
+
+example(of: "count") {
+// 1
+let publisher = ["A", "B", "C"].publisher
+// 2
+publisher
+.print("publisher")
+.count()
+.sink(receiveValue: { print("I have \($0) items") })
+.store(in: &subscriptions)
+}
+
+```
+> ——— Example of: count ———
+> publisher: receive subscription: (["A", "B", "C"])
+> publisher: request unlimited
+> publisher: receive value: (A)
+> publisher: receive value: (B)
+> publisher: receive value: (C)
+> publisher: receive finished
+> I have 3 items
+
+## contains
+
+```swift
+
+example(of: "contains") {
+// 1
+let publisher = ["A", "B", "C", "D", "E"].publisher
+let letter = "C"
+// 2
+publisher
+.print("publisher")
+.contains(letter)
+.sink(receiveValue: { contains in
+// 3
+print(contains ? "Publisher emitted \(letter)!"
+: "Publisher never emitted \(letter)!")
+})
+.store(in: &subscriptions)
+}
+
+```
+
+> ——— Example of: contains ———
+> publisher: receive subscription: (["A", "B", "C", "D", "E"])
+> publisher: request unlimited
+> publisher: receive value: (A)
+> publisher: receive value: (B)
+> publisher: receive value: (C)
+> publisher: receive cancel
+> Publisher emitted C!
+
+
+```swift
+
+example(of: "contains(where:)") {
+// 1
+struct Person {
+let id: Int
+let name: String
+}
+// 2
+let people = [
+(456, "Scott Gardner"),
+(123, "Shai Mishali"),
+(777, "Marin Todorov"),
+(214, "Florent Pillet")
+]
+.map(Person.init)
+.publisher
+// 3
+people
+.contains(where: { $0.id == 800 })
+.sink(receiveValue: { contains in
+// 4
+print(contains ? "Criteria matches!"
+: "Couldn't find a match for the criteria")
+})
+.store(in: &subscriptions)
+}
+
+```
+
+> ——— Example of: contains(where:) ———
+> Couldn't find a match for the criteria
+
+## allSatisfy
+
+```swift
+
+example(of: "allSatisfy") {
+// 1
+let publisher = stride(from: 0, to: 5, by: 2).publisher
+// 2
+publisher
+.print("publisher")
+.allSatisfy { $0 % 2 == 0 }
+.sink(receiveValue: { allEven in
+print(allEven ? "All numbers are even"
+: "Something is odd...")
+})
+.store(in: &subscriptions)
+}
+
+```
+
+> ——— Example of: allSatisfy ———
+> publisher: receive subscription: (Sequence)
+> publisher: request unlimited
+> publisher: receive value: (0)
+> publisher: receive value: (2)
+> publisher: receive value: (4)
+> publisher: receive finished
+> All numbers are even
+
+
+## reduce
+
+```swift
+
+example(of: "reduce") {
+// 1
+let publisher = ["Hel", "lo", " ", "Wor", "ld", "!"].publisher
+publisher
+.print("publisher")
+.reduce("") { accumulator, value in
+// 2
+accumulator + value
+}
+.sink(receiveValue: { print("Reduced into: \($0)") })
+.store(in: &subscriptions)
+}
+
+```
+
+> ——— Example of: reduce ———
+> publisher: receive subscription: (["Hel", "lo", " ", "Wor","ld", "!"])
+> publisher: request unlimited
+> publisher: receive value: (Hel)
+> publisher: receive value: (lo)
+> publisher: receive value: ( )
+> publisher: receive value: (Wor)
+> publisher: receive value: (ld)
+> publisher: receive value: (!)
+> publisher: receive finished
+> Reduced into: Hello World!
+
+- you can reduce the syntax above. Replace the following code:
+```swift
+.reduce("", +)
+```
+
+> Note: Does this operator feel a bit familiar? Well, scan and reduce have the same functionality, with the main difference being that scan emits the accumulated value for every emitted value, while reduce emits a single accumulated value once the upstream publisher sends a .finished completion event. Feel free to change reduce to scan in the above example and try it out for yourself.
+
+
+# Networking
+
+## URLSession extensions
+
+```swift
+
+guard let url = URL(string: "https://mysite.com/mydata.json") else {
+    return
+}
+// 1
+let subscription = URLSession.shared
+// 2
+.dataTaskPublisher(for: url)
+.sink(receiveCompletion: { completion in
+// 3
+if case .failure(let err) = completion {
+print("Retrieving data failed with error \(err)")
+}
+}, receiveValue: { data, response in
+// 4
+print("Retrieved data of size \(data.count), response = \
+(response)")
+})
+
+```
+
+## Codable support
+
+```swift
+
+let subscription = URLSession.shared
+.dataTaskPublisher(for: url)
+.tryMap { data, _ in
+try JSONDecoder().decode(MyType.self, from: data)
+}
+.sink(receiveCompletion: { completion in
+if case .failure(let err) = completion {
+print("Retrieving data failed with error \(err)")
+}
+}, receiveValue: { object in
+print("Retrieved object \(object)")
+})
+
+```
+
+- You decode the JSON inside a tryMap, which works, but Combine provides an operator to help reduce the boilerplate: decode(type:decoder:).
+- In the example above, replace the tryMap operator with the following lines:
+
+```swift
+
+.map(\.data)
+.decode(type: MyType.self, decoder: JSONDecoder())
+
+```
+
+## Publishing network data to multiple subscribers
+
+```swift
+
+let url = URL(string: "https://www.raywenderlich.com")!
+let publisher = URLSession.shared
+// 1
+.dataTaskPublisher(for: url)
+.map(\.data)
+.multicast { PassthroughSubject<Data, URLError>() }
+// 2
+let subscription1 = publisher
+.sink(receiveCompletion: { completion in
+if case .failure(let err) = completion {
+print("Sink1 Retrieving data failed with error \(err)")
+}
+}, receiveValue: { object in
+print("Sink1 Retrieved object \(object)")
+})
+// 3
+let subscription2 = publisher
+.sink(receiveCompletion: { completion in
+if case .failure(let err) = completion {
+print("Sink2 Retrieving data failed with error \(err)")
+}
+}, receiveValue: { object in
+print("Sink2 Retrieved object \(object)")
+})
+// 4
+let subscription = publisher.connect()
+
+```
+> Note: Make sure to store all of your Cancellables; otherwise, they would be deallocated and canceled when leaving the current code scope, which would be immediate in this specific case.
+
+
+# Debugging
+
+## Printing events
+
+```swift
+
+let subscription = (1...3).publisher
+.print("publisher")
+.sink { _ in }
+
+```
+> publisher: receive subscription: (1...3)
+> publisher: request unlimited
+> publisher: receive value: (1)
+> publisher: receive value: (2)
+> publisher: receive value: (3)
+> publisher: receive finished
+
+- For example, you can create a simple logger that displays the time interval between each string so you can get a sense of how fast your publisher emits values:
+
+```swift
+
+class TimeLogger: TextOutputStream {
+private var previous = Date()
+private let formatter = NumberFormatter()
+init() {
+formatter.maximumFractionDigits = 5
+formatter.minimumFractionDigits = 5
+}
+func write(_ string: String) {
+let trimmed =
+string.trimmingCharacters(in: .whitespacesAndNewlines)
+guard !trimmed.isEmpty else { return }
+let now = Date()
+print("+\(formatter.string(for:
+now.timeIntervalSince(previous))!)s: \(string)")
+previous = now
+}
+}
+
+
+let subscription = (1...3).publisher
+.print("publisher", to: TimeLogger())
+.sink { _ in }
+
+```
+
+> +0.00111s: publisher: receive subscription: (1...3)
+> +0.03485s: publisher: request unlimited
+> +0.00035s: publisher: receive value: (1)
+> +0.00025s: publisher: receive value: (2)
+> +0.00027s: publisher: receive value: (3)
+> +0.00024s: publisher: receive finished
+
+## Acting on events — performing side effects
+
+```swift
+
+let request = URLSession.shared
+.dataTaskPublisher(for: URL(string: "https://
+www.raywenderlich.com/")!)
+request
+.sink(receiveCompletion: { completion in
+print("Sink received completion: \(completion)")
+}) { (data, _) in
+print("Sink received data: \(data)")
+}
+
+
+.handleEvents(receiveSubscription: { _ in
+print("Network request will start")
+}, receiveOutput: { _ in
+print("Network request data received")
+}, receiveCancel: {
+print("Network request cancelled")
+})
+
+```
+
+## Using the debugger as a last resort
+
+```swift
+.breakpoint(receiveOutput: { value in
+return value > 10 && value < 15
+})
+```
+> Note: None of the breakpoint publishers will work in playgrounds. You will see an error that execution was interrupted, but it won‘t drop into the debugger.
+
+# Timers
+
+## Using RunLoop
+
+> Note: One important note and a red light warning in Apple’s documentation is that the RunLoop class is not thread-safe. You should only call RunLoop methods for the run loop of the current thread.
+
+```swift
+
+let runLoop = RunLoop.main
+let subscription = runLoop.schedule(
+after: runLoop.now,
+interval: .seconds(1),
+tolerance: .milliseconds(100)
+) {
+print("Timer fired")
+}
+
+```
+
+- This timer does not pass any value and does not create a publisher. It starts at the date specified in the after: parameter with the specified interval and tolerance, and that’s about it. Its only usefulness in relation to Combine is that the Cancellable it returns lets you stop the timer after a while.
+
+```swift
+runLoop.schedule(after: .init(Date(timeIntervalSinceNow: 3.0)))
+{
+cancellable.cancel()
+}
+
+```
+
+## Using the Timer class
+
+```swift
+// 1
+let publisher = Timer.publish(every: 1.0, on: .main,in: .common)
+
+// 2
+let publisher = Timer.publish(every: 1.0, on: .current, in: .common)
+```
+> Note: Running this code on a Dispatch queue other than DispatchQueue.main may lead to unpredictable results. The Dispatch framework manages its threads without using run loops. Since a run loop requires one of its run methods to be called to process events, you would never see the timer fire on any queue other than the main one. Stay safe and target RunLoop.main for your Timers.
+
+```swift
+
+let publisher = Timer.publish(every: 1.0, on: .main, in: .common).autoconnect()
+
+```
+- For example:
+
+```swift
+
+let subscription = Timer
+.publish(every: 1.0, on: .main, in: .common)
+.autoconnect()
+.scan(0) { counter, _ in counter + 1 }
+.sink { counter in
+print("Counter is \(counter)")
+}
+
+```
+
+## Using DispatchQueue
+
+```swift
+
+let queue = DispatchQueue.main
+// 1
+let source = PassthroughSubject<Int, Never>()
+// 2
+var counter = 0
+// 3
+let cancellable = queue.schedule(
+after: queue.now,
+interval: .seconds(1)
+) {
+source.send(counter)
+counter += 1
+}
+// 4
+let subscription = source.sink {
+print("Timer emitted \($0)")
+}
+
+```
+
+# Key-Value Observing
+
+## Introducing publisher(for:options:)
+
+```swift
+
+let queue = OperationQueue()
+let subscription = queue.publisher(for: \.operationCount)
+.sink {
+print("Outstanding operations in queue: \($0)")
+}
+```
+
+> Note: There is no central list of KVO-compliant properties throughout the frameworks. The documentation for each class usually indicates which properties are KVO-compliant. But sometimes the documentation can be sparse, and you’ll only find a quick note in the documentation for some of the properties.
+
+## Preparing and subscribing to your own KVO-compliant properties
+
+> Note: While the Swift language doesn’t directly support KVO, marking your properties @objc dynamic forces the compiler to generate hidden methods that trigger the KVO machinery. Describing this machinery is out of the scope of this book. Suffice to say the machinery heavily relies on specific methods from the NSObject protocol, which explains why your objects need to inherit from it.
+
+```swift
+
+// 1
+class TestObject: NSObject {
+// 2
+@objc dynamic var integerProperty: Int = 0
+}
+let obj = TestObject()
+// 3
+let subscription = obj.publisher(for: \.integerProperty)
+.sink {
+print("integerProperty changes to \($0)")
+}
+// 4
+obj.integerProperty = 100
+obj.integerProperty = 200
+
+```
+> integerProperty changes to 0
+> integerProperty changes to 100
+> integerProperty changes to 200
+
+- Try it! Add a couple more properties to TestObject:
+
+```swift
+@objc dynamic var stringProperty: String = ""
+@objc dynamic var arrayProperty: [Float] = []
+```
+```swift
+let subscription2 = obj.publisher(for: \.stringProperty)
+.sink {
+print("stringProperty changes to \($0)")
+}
+let subscription3 = obj.publisher(for: \.arrayProperty)
+.sink {
+print("arrayProperty changes to \($0)")
+}
+```
+- And finally, some property changes:
+
+```swift
+
+obj.stringProperty = "Hello"
+obj.arrayProperty = [1.0]
+obj.stringProperty = "World"
+obj.arrayProperty = [1.0, 2.0]
+
+```
+
+# Resource Management
+
+## The share() operator
+
+> Note: New subscribers will only receive values the upstream publisher emits after they subscribe. There’s no buffering or replay involved. If a subscriber subscribes to a shared publisher after the upstream publisher has completed, that new subscriber only receives the completion event.
+
+```swift
+
+let shared = URLSession.shared
+.dataTaskPublisher(for: URL(string: "https://
+www.raywenderlich.com")!)
+.map(\.data)
+.print("shared")
+.share()
+print("subscribing first")
+let subscription1 = shared.sink(
+receiveCompletion: { _ in },
+receiveValue: { print("subscription1 received: '\($0)'") }
+)
+print("subscribing second")
+let subscription2 = shared.sink(
+receiveCompletion: { _ in },
+receiveValue: { print("subscription2 received: '\($0)'") }
+)
+
+```
+> subscribing first
+> shared: receive subscription: (DataTaskPublisher)
+> shared: request unlimited
+> subscribing second
+> shared: receive value: (153217 bytes)
+> subscription1 received: '153217 bytes'
+> subscription2 received: '153217 bytes'
+> shared: receive finished
+
+```swift
+
+var subscription2: AnyCancellable? = nil
+DispatchQueue.main.asyncAfter(deadline: .now() + 5) {
+print("subscribing second")
+subscription2 = shared.sink(
+receiveCompletion: { print("subscription2 completion \($0)")
+},
+receiveValue: { print("subscription2 received: '\($0)'") }
+)
+}
+
+```
+> subscribing first
+> shared: receive subscription: (DataTaskPublisher)
+> shared: request unlimited
+> shared: receive value: (153217 bytes)
+> subscription1 received: '153217 bytes'
+> shared: receive finished
+> subscribing second
+> subscription2 completion finished
+
+## The multicast(_:) operator
+
+```swift
+// 1
+let subject = PassthroughSubject<Data, URLError>() // 2
+// 2
+let multicasted = URLSession.shared
+.dataTaskPublisher(for: URL(string: "https://
+www.raywenderlich.com")!)
+.map(\.data)
+.print("shared")
+.multicast(subject: subject)
+// 3
+let subscription1 = multicasted
+.sink(
+receiveCompletion: { _ in },
+receiveValue: { print("subscription1 received: '\($0)'") }
+)
+let subscription2 = multicasted
+.sink(
+receiveCompletion: { _ in },
+receiveValue: { print("subscription2 received: '\($0)'") }
+)
+// 4
+multicasted.connect()
+// 5
+subject.send(Data())
+
+```
+
+> subscribing first
+> shared: receive subscription: (DataTaskPublisher)
+> shared: request unlimited
+> subscription1 received: '0 bytes'
+> subscription2 received: '0 bytes'
+> shared: receive cancel
+
+> Note: A multicast publisher, like all ConnectablePublishers, also provides an autoconnect() method, which makes it work like share(): The first time you subscribe to it, it connects to the upstream publisher and starts the work immediately. This is useful in scenarios where the upstream publisher emits a single value and you can use a CurrentValueSubject to share it with subscribers.
+
+
+# Future
+
+```swift
+
+let future = Future<Int, Error> { fulfill in
+do {
+let result = try performSomeWork()
+fulfill(.success(result))
+} catch {
+fulfill(.failure(error))
+}
+}
+
+```
+> Note: Even if you never subscribe to a Future, creating it will call your closure and perform the work. You cannot rely on Deferred to defer closure execution until a subscriber comes in, because Deferred is a struct and would cause a new Future to be created every time there is a new subscriber!
+
+# Error Handling
+
+## Never
+- A publisher whose Failure is of type Never indicates that the publisher can never fail.
+
+
+```swift
+
+example(of: "Never sink") {
+Just("Hello")
+.sink(receiveValue: { print($0) })
+.store(in: &subscriptions)
+}
+
+```
+
+> ——— Example of: Never sink ———
+> Hello
+
+
+## setFailureType
+
+```swift
+enum MyError: Error {
+case ohNo
+}
+example(of: "setFailureType") {
+Just("Hello").setFailureType(to: MyError.self)
+}
+
+```
+
+```swift
+
+// 1
+.sink(
+receiveCompletion: { completion in
+switch completion {
+// 2
+case .failure(.ohNo):
+print("Finished with Oh No!")
+case .finished:
+print("Finished successfully!")
+}
+},
+receiveValue: { value in
+print("Got value: \(value)")
+}
+)
+.store(in: &subscriptions)
+
+```
+
+> ——— Example of: setFailureType ———
+> Got value: Hello
+> Finished successfully!
+
+
+## assign(to:on:)
+
+```swift
+
+example(of: "assign") {
+// 1
+class Person {
+let id = UUID()
+var name = "Unknown"
+}
+// 2
+let person = Person()
+print("1", person.name)
+Just("Shai")
+.handleEvents( // 3
+receiveCompletion: { _ in print("2", person.name) }
+)
+.assign(to: \.name, on: person) // 4
+.store(in: &subscriptions)
+}
+
+```
+
+> ——— Example of: assign ———
+> 1 Unknown
+> 2 Shai
+
+## assertNoFailure
+
+```swift
+
+example(of: "assertNoFailure") {
+// 1
+Just("Hello")
+.setFailureType(to: MyError.self)
+.assertNoFailure() // 2
+.sink(receiveValue: { print("Got value: \($0) ")}) // 3
+.store(in: &subscriptions)
+}
+
+```
+> ——— Example of: assertNoFailure ———
+> Got value: Hello
+
+- Now, after setFailureType, add the following line:
+
+```swift
+.tryMap { _ in throw MyError.ohNo }
+```
+
+> Playground execution failed:
+> error: Execution was interrupted, reason: EXC_BAD_INSTRUCTION
+> (code=EXC_I386_INVOP, subcode=0x0).
+> ...
+> frame #0: 0x00007fff232fbbf2
+> Combine`Combine.Publishers.AssertNoFailure...
+
+
+## Dealing with failure - try* operators - 
+
+> Note: All try-prefixed operators in Combine behave the same way when it comes to errors. In the essence of time, you'll only experiment with the tryMap operator throughout this chapter.
+
+```swift
+
+example(of: "tryMap") {
+// 1
+enum NameError: Error {
+case tooShort(String)
+case unknown
+}
+// 2
+let names = ["Scott", "Marin", "Shai", "Florent"].publisher
+names
+// 3
+.map { value in
+return value.count
+}
+.sink(receiveCompletion: { print("Completed with \($0)") },
+receiveValue: { print("Got value: \($0)") })
+}
+
+```
+> ——— Example of: tryMap ———
+> Got value: 5
+> Got value: 5
+> Got value: 4
+> Got value: 7
+> Completed with finished
+
+- Replace the map in the above example with the following:
+
+```swift
+
+.map { value -> Int in
+// 1
+let length = value.count
+// 2
+guard length >= 5 else {
+throw NameError.tooShort(value)
+}
+// 3
+return value.count
+}
+
+```
+## Mapping errors
+
+```swift
+
+example(of: "map vs tryMap") {
+// 1
+enum NameError: Error {
+case tooShort(String)
+case unknown
+}
+// 2
+Just("Hello")
+.setFailureType(to: NameError.self) // 3
+.map { $0 + " World!" } // 4
+.sink(
+receiveCompletion: { completion in
+// 5
+switch completion {
+case .finished:
+print("Done!")
+case .failure(.tooShort(let name)):
+print("\(name) is too short!")
+case .failure(.unknown):
+
+print("An unknown name error occurred")
+}
+},
+receiveValue: { print("Got value \($0)") }
+)
+.store(in: &subscriptions)
+}
+
+```
+
+> ——— Example of: map vs tryMap ———
+> Got value Hello World!
+> Done!
+
+## Designing your fallible APIs
+
+```swift
+
+example(of: "Joke API") {
+class DadJokes {
+// 1
+struct Joke: Codable {
+let id: String
+let joke: String
+}
+// 2
+func getJoke(id: String) -> AnyPublisher<Joke, Error> {
+let url = URL(string: "https://icanhazdadjoke.com/j/\
+(id)")!
+var request = URLRequest(url: url)
+request.allHTTPHeaderFields = ["Accept": "application/
+json"]
+// 3
+return URLSession.shared
+.dataTaskPublisher(for: request)
+.map(\.data)
+.decode(type: Joke.self, decoder: JSONDecoder())
+.eraseToAnyPublisher()
+}
+}
+}
+
+// 4
+let api = DadJokes()
+let jokeID = "9prWnjyImyd"
+let badJokeID = "123456"
+// 5
+api
+.getJoke(id: jokeID)
+.sink(receiveCompletion: { print($0) },
+receiveValue: { print("Got joke: \($0)") })
+.store(in: &subscriptions)
+
+```
+> ——— Example of: Joke API ———
+> Got joke: Joke(id: "9prWnjyImyd", joke: "Why do bears have hairy
+> coats? Fur protection.")
+> finished
+
+## Catching and retrying
+
+# Schedulers
+## OperationQueue
+
+
+# Custom Publishers & Handling Backpressure
